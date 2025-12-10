@@ -4,8 +4,3 @@ MULTIMODAL_CONVERSATION_TEMPLATE = (
     "<LM_SYSTEM_PROMPT> {system_prompt} </LM_SYSTEM_PROMPT>\n\n"
     "<LM_OUTPUT> {response_value} </LM_OUTPUT>\n\n"
 )
-
-IMAGE_FEEDBACK_INSTRUCTION = (
-    "The variable receiving feedback is an image. Describe concrete visual edits that would improve it and avoid proposing full"
-    " textual rewrites."
-)
