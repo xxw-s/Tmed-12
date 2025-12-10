@@ -22,13 +22,6 @@ OPTIMIZER_SYSTEM_PROMPT = (
     f"{GLOSSARY_TEXT}"
 )
 
-IMAGE_OPTIMIZER_SYSTEM_PROMPT = (
-    "You are part of an optimization system that iteratively improves images. "
-    "You will receive the current image, contextual transcripts, and feedback describing the desired changes. "
-    "Propose concrete visual edits that respect the feedback and constraints. "
-    "You must return the updated image encoded in Base64 between {new_variable_start_tag} {{improved image}} {new_variable_end_tag} tags."
-)
-
 # TGD update instruction
 TGD_PROMPT_PREFIX = (
     "Here is the role of the variable you will improve: <ROLE>{variable_desc}</ROLE>.\n\n"
@@ -53,17 +46,6 @@ TGD_PROMPT_SUFFIX  = (
     "Send the improved variable "
     "in the following format:\n\n{new_variable_start_tag}{{the improved variable}}{new_variable_end_tag}\n\n"
     "Send ONLY the improved variable between the <IMPROVED_VARIABLE> tags, and nothing else."
-)
-
-IMAGE_TGD_PROMPT_PREFIX = (
-    "You will improve an image with the following role: <ROLE>{variable_desc}</ROLE>.\n\n"
-    "A preview of the current image is provided separately.\n\n"
-    "Here is the feedback we received about this image: <FEEDBACK>{variable_grad}</FEEDBACK>\n\n"
-)
-
-IMAGE_TGD_PROMPT_SUFFIX = (
-    "Generate an updated image that satisfies the feedback. "
-    "Return only the improved image encoded as Base64 between {new_variable_start_tag}{{base64 image}}{new_variable_end_tag}."
 )
 
 MOMENTUM_PROMPT_ADDITION = (
@@ -128,37 +110,14 @@ def construct_tgd_prompt(do_momentum: bool = False,
     else:
         return gradient_context + [prompt]
 
-def construct_image_optimization_prompt(do_constrained: bool = False,
-                                        do_in_context_examples: bool = False,
-                                        do_gradient_memory: bool = False,
-                                        **optimizer_kwargs):
-    """Construct the prompt for multimodal/image optimization."""
-
-    prompt = IMAGE_TGD_PROMPT_PREFIX.format(**optimizer_kwargs)
-
-    if do_gradient_memory:
-        prompt += MOMENTUM_PROMPT_ADDITION.format(**optimizer_kwargs)
-
-    if do_constrained:
-        prompt += CONSTRAINT_PROMPT_ADDITION.format(**optimizer_kwargs)
-
-    if do_in_context_examples:
-        prompt += IN_CONTEXT_EXAMPLE_PROMPT_ADDITION.format(**optimizer_kwargs)
-
-    prompt += IMAGE_TGD_PROMPT_SUFFIX.format(**optimizer_kwargs)
-
-    return prompt
-
 # This is how we save gradients to the variable.
 GRADIENT_TEMPLATE = (
     "Here is a conversation:\n\n<CONVERSATION>{context}</CONVERSATION>\n\n"
     "This conversation is potentially part of a larger system. The output is used as {response_desc}\n\n"
-    "The variable in focus is {variable_desc}, which is {variable_modality}.\n\n"
     "Here is the feedback we got for {variable_desc} in the conversation:\n\n<FEEDBACK>{feedback}</FEEDBACK>\n\n"
 )
 GRADIENT_MULTIPART_TEMPLATE = (
     "Above is a conversation with a language model.\n"
     "This conversation is potentially part of a larger system. The output is used as {response_desc}\n\n"
-    "The variable in focus is {variable_desc}, which is {variable_modality}.\n\n"
     "Here is the feedback we got for {variable_desc} in the conversation:\n\n<FEEDBACK>{feedback}</FEEDBACK>\n\n"
 )
