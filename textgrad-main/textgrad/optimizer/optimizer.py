@@ -1,21 +1,11 @@
 from abc import ABC, abstractmethod
 from typing import List, Union
 from collections import defaultdict
-
-import base64
-import binascii
 from textgrad.variable import Variable
 from textgrad import logger
-from textgrad.engine import EngineLM, validate_multimodal_engine
+from textgrad.engine import EngineLM
 from textgrad.config import validate_engine_or_get_default
-from .optimizer_prompts import (
-    construct_image_optimization_prompt,
-    construct_tgd_prompt,
-    IMAGE_OPTIMIZER_SYSTEM_PROMPT,
-    OPTIMIZER_SYSTEM_PROMPT,
-    GRADIENT_TEMPLATE,
-    GRADIENT_MULTIPART_TEMPLATE,
-)
+from .optimizer_prompts import construct_tgd_prompt, OPTIMIZER_SYSTEM_PROMPT, GRADIENT_TEMPLATE, GRADIENT_MULTIPART_TEMPLATE
 
 
 def get_gradient_and_context_text(variable) -> Union[str, List[Union[str, bytes]]]:
@@ -68,7 +58,9 @@ class Optimizer(ABC):
     """
 
     def __init__(self, parameters: List[Variable]):
-        
+        for parameter in parameters:
+            if type(parameter.value) !=  str:
+                raise NotImplementedError(f"We cannot yet update multimodal content and this data type: {type(parameter.value)}. We can only evaluate gradients using multimodal models. This may change soon (looking at you, GPT-5).")
         self.parameters = parameters
         
     def zero_grad(self):
@@ -114,13 +106,6 @@ class TextualGradientDescent(Optimizer):
         :type gradient_memory: int, optional
         """
         super().__init__(parameters)
-
-        for parameter in self.parameters:
-            if not isinstance(parameter.value, str):
-                raise NotImplementedError(
-                    "TextualGradientDescent only supports string variables. "
-                    "Use MultimodalGradientDescent for image parameters."
-                )
 
         if new_variable_tags is None:
             new_variable_tags = ["<IMPROVED_VARIABLE>", "</IMPROVED_VARIABLE>"]
@@ -169,8 +154,7 @@ class TextualGradientDescent(Optimizer):
             "new_variable_start_tag": self.new_variable_tags[0],
             "new_variable_end_tag": self.new_variable_tags[1],
             "in_context_examples": "\n".join(self.in_context_examples),
-            "gradient_memory": grad_memory,
-            "past_values": grad_memory,
+            "gradient_memory": grad_memory
         }
         
         prompt = construct_tgd_prompt(do_constrained=self.do_constrained, 
@@ -221,148 +205,6 @@ class TextualGradientDescent(Optimizer):
 
                 return extracted_texts
 
-class MultimodalGradientDescent(Optimizer):
-    def __init__(self,
-                 parameters: List[Variable],
-                 engine: Union[EngineLM, str] = None,
-                 constraints: List[str] = None,
-                 new_variable_tags: List[str] = None,
-                 optimizer_system_prompt: str = IMAGE_OPTIMIZER_SYSTEM_PROMPT,
-                 in_context_examples: List[str] = None,
-                 gradient_memory: int = 0,
-                 verbose: int = 0):
-        super().__init__(parameters)
-
-        for parameter in self.parameters:
-            if not isinstance(parameter.value, (bytes, bytearray)):
-                raise NotImplementedError(
-                    "MultimodalGradientDescent expects image variables encoded as bytes."
-                )
-
-        if new_variable_tags is None:
-            new_variable_tags = ["<IMPROVED_VARIABLE>", "</IMPROVED_VARIABLE>"]
-
-        self.engine = validate_engine_or_get_default(engine)
-        validate_multimodal_engine(self.engine)
-
-        self.verbose = verbose
-        self.constraints = constraints if constraints is not None else []
-        self.optimizer_system_prompt = optimizer_system_prompt.format(
-            new_variable_start_tag=new_variable_tags[0],
-            new_variable_end_tag=new_variable_tags[1],
-        )
-        self.do_constrained = len(self.constraints) > 0
-        self.new_variable_tags = new_variable_tags
-        self.in_context_examples = in_context_examples if in_context_examples is not None else []
-        self.do_in_context_examples = len(self.in_context_examples) > 0
-        self.gradient_memory = gradient_memory
-        self.do_gradient_memory = gradient_memory > 0
-        self.gradient_memory_dict = defaultdict(list)
-
-    @property
-    def constraint_text(self) -> str:
-        constraints_ordered = [f"Constraint {i+1}: {constraint}" for i, constraint in enumerate(self.constraints)]
-        return "\n".join(constraints_ordered)
-
-    def get_gradient_memory_text(self, variable: Variable) -> str:
-        grad_memory = ""
-        variable_grad_memory = self.gradient_memory_dict[variable][-self.gradient_memory:]
-        for i, grad_info in enumerate(variable_grad_memory):
-            grad_memory += f"\n<FEEDBACK-{i+1}> {grad_info['value']}</FEEDBACK-{i+1}>\n"
-        return grad_memory
-
-    def update_gradient_memory(self, variable: Variable):
-        self.gradient_memory_dict[variable].append({"value": variable.get_gradient_text()})
-
-    def _update_prompt(self, variable: Variable) -> List[Union[str, bytes]]:
-        grad_memory = self.get_gradient_memory_text(variable)
-        gradients = get_gradient_and_context_text(variable)
-        if isinstance(gradients, list):
-            context_segments = list(gradients)
-            gradient_summary = "Refer to the preceding multimodal conversation and feedback segments."
-        else:
-            context_segments = []
-            gradient_summary = gradients
-
-        optimizer_information = {
-            "variable_desc": variable.get_role_description(),
-            "variable_grad": gradient_summary,
-            "constraint_text": self.constraint_text,
-            "new_variable_start_tag": self.new_variable_tags[0],
-            "new_variable_end_tag": self.new_variable_tags[1],
-            "in_context_examples": "\n".join(self.in_context_examples),
-            "gradient_memory": grad_memory,
-            "past_values": grad_memory,
-        }
-
-        prompt_tail = construct_image_optimization_prompt(
-            do_constrained=self.do_constrained,
-            do_in_context_examples=(self.do_in_context_examples and (len(self.in_context_examples) > 0)),
-            do_gradient_memory=(self.do_gradient_memory and (grad_memory != "")),
-            **optimizer_information,
-        )
-
-        prompt_segments: List[Union[str, bytes]] = [bytes(variable.get_value())]
-        if context_segments:
-            prompt_segments.extend(context_segments)
-        prompt_segments.append(prompt_tail)
-        return prompt_segments
-
-    def _decode_response(self, response: str) -> bytes:
-        try:
-            payload = response.split(self.new_variable_tags[0])[1].split(self.new_variable_tags[1])[0].strip()
-        except IndexError as exc:
-            raise ValueError(
-                "MultimodalGradientDescent optimizer response missing improved image tags."
-            ) from exc
-
-        try:
-            return base64.b64decode(payload)
-        except (binascii.Error, ValueError) as exc:
-            raise ValueError("Failed to decode improved image payload from optimizer response.") from exc
-
-    def step(self, **sample_params):
-        for parameter in self.parameters:
-            prompt_update_parameter = self._update_prompt(parameter)
-            raw_response = self.engine(
-                prompt_update_parameter,
-                system_prompt=self.optimizer_system_prompt,
-                **sample_params,
-            )
-
-            responses = raw_response if isinstance(raw_response, list) else [raw_response]
-            decoded_images = []
-            for response in responses:
-                try:
-                    decoded_images.append(self._decode_response(response))
-                except ValueError as exc:
-                    logger.error(
-                        "MultimodalGradientDescent failed to parse optimizer response.",
-                        extra={"optimizer.response": response, "error": str(exc)},
-                    )
-                    continue
-
-            if not decoded_images:
-                raise ValueError("MultimodalGradientDescent could not decode any improved images.")
-
-            parameter.set_value(decoded_images[0])
-            logger.info(
-                "MultimodalGradientDescent updated image",
-                extra={"parameter.summary": parameter.get_short_value()},
-            )
-
-            if self.verbose:
-                print("---------------------MultimodalGradientDescent----------------------")
-                print(parameter.get_short_value())
-
-            if self.do_gradient_memory:
-                self.update_gradient_memory(parameter)
-
-            if len(decoded_images) == 1:
-                return decoded_images[0]
-
-            return decoded_images
-
 
 class TextualGradientDescentwithMomentum(Optimizer):
     def __init__(self, 
@@ -374,12 +216,6 @@ class TextualGradientDescentwithMomentum(Optimizer):
                  in_context_examples: List[str]=None,
                  optimizer_system_prompt: str=OPTIMIZER_SYSTEM_PROMPT):
         super().__init__(parameters)
-
-        for parameter in self.parameters:
-            if not isinstance(parameter.value, str):
-                raise NotImplementedError(
-                    "TextualGradientDescentwithMomentum only supports string variables."
-                )
 
         if new_variable_tags is None:
             new_variable_tags = ["<IMPROVED_VARIABLE>", "</IMPROVED_VARIABLE>"]
