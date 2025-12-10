@@ -1,16 +1,12 @@
 from textgrad import logger
 from textgrad.engine import EngineLM
-
-from typing import Any, List, Set, Dict, Union
-import base64
-import hashlib
-
+from typing import List, Set, Dict
 import httpx
 from collections import defaultdict
 from functools import partial
 from .config import SingletonBackwardEngine
 from .utils.image_utils import is_valid_url
-#from typing import Union
+from typing import Union
 import numpy as np
 class Variable:
     def __init__(
@@ -63,28 +59,21 @@ class Variable:
             self.value = value
             
         self.gradients: Set[Variable] = set()
-        self.gradients_context: Dict[Variable, Any] = defaultdict(lambda: None)
+        self.gradients_context: Dict[Variable, str] = defaultdict(lambda: None)
         self.grad_fn = None
         self.role_description = role_description
         self.predecessors = set(predecessors)
         self.requires_grad = requires_grad
         self._reduce_meta = []
         
-        self.modality = "image" if isinstance(self.value, (bytes, bytearray)) else "text"
+        if requires_grad and (type(value) == bytes):
+            raise ValueError("Gradients are not yet supported for image inputs. Please provide a string input instead.")
 
-    def get_modality(self) -> str:
-        return self.modality
-
-    def describe_modality(self) -> str:
-        return "an image" if self.modality == "image" else "text"
-    
     def __repr__(self):
-        return f"Variable(value={self.get_short_value()}, role={self.get_role_description()}, grads={self.gradients})"
+        return f"Variable(value={self.value}, role={self.get_role_description()}, grads={self.gradients})"
 
     def __str__(self):
-        if isinstance(self.value, str):
-            return self.value
-        return self.get_short_value()
+        return str(self.value)
 
     def __add__(self, to_add):
         # For now, let's just assume variables can be passed to models
@@ -126,12 +115,6 @@ class Variable:
         :param n_words_offset: The number of words to show from the beginning and the end of the value.
         :type n_words_offset: int
         """
-
-        if isinstance(self.value, (bytes, bytearray)):
-            digest = hashlib.sha256(bytes(self.value)).hexdigest()[:8]
-            preview = base64.b64encode(bytes(self.value))[:32].decode("ascii", errors="ignore")
-            return f"<image len={len(self.value)} sha256={digest} preview={preview}...>"
-
         words = self.value.split(" ")
         if len(words) <= 2 * n_words_offset:
             return self.value
@@ -142,17 +125,7 @@ class Variable:
         return self.value
 
     def set_value(self, value):
-        if isinstance(value, int) or np.issubdtype(type(value), np.integer):
-            value = str(value)
-
-        if isinstance(value, bytearray):
-            value = bytes(value)
-
-        if not isinstance(value, (str, bytes)):
-            raise TypeError(f"Variable value must be a string or bytes, got {type(value)}")
-
         self.value = value
-        self.modality = "image" if isinstance(self.value, bytes) else "text"
 
     def set_grad_fn(self, grad_fn):
         self.grad_fn = grad_fn
