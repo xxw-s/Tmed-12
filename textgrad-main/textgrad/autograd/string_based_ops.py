@@ -123,9 +123,7 @@ class StringBasedFunction(Function):
                 "function_purpose": function_purpose,
                 "inputs_string": inputs_string,
                 "variable_desc": variable.get_role_description(),
-                "variable_short": variable.get_short_value(),
-                "variable_modality": variable.describe_modality(),
-                "variable_modality_type": variable.get_modality()
+                "variable_short": variable.get_short_value()
             }
             
             backward_prompt = StringBasedFunction._construct_string_fn_chain_backward_prompt(backward_info)
@@ -138,11 +136,9 @@ class StringBasedFunction(Function):
             variable.gradients.add(var_gradients)
             conversation = CONVERSATION_TEMPLATE_STRING.format(**backward_info)
             variable.gradients_context[var_gradients] = {
-                "context": conversation,
+                "context": conversation, 
                 "response_desc": response.get_role_description(),
-                "variable_desc": variable.get_role_description(),
-                "variable_modality": variable.describe_modality(),
-                "variable_modality_type": variable.get_modality()
+                "variable_desc": variable.get_role_description()
             }
             
             if response._reduce_meta:
@@ -176,9 +172,7 @@ class StringBasedFunction(Function):
                 "function_purpose": function_purpose,
                 "inputs_string": inputs_string,
                 "variable_desc": variable.get_role_description(),
-                "variable_short": variable.get_short_value(),
-                "variable_modality": variable.describe_modality(),
-                "variable_modality_type": variable.get_modality()
+                "variable_short": variable.get_short_value()
             }
             backward_prompt = StringBasedFunction._construct_string_fn_base_backward_prompt(backward_info)
             
@@ -190,11 +184,9 @@ class StringBasedFunction(Function):
             var_gradients = Variable(value=gradient_value, role_description=f"feedback to {variable.get_role_description()}")
             variable.gradients.add(var_gradients)
             variable.gradients_context[var_gradients] = {
-                "context": conversation,
+                "context": conversation, 
                 "response_desc": response.get_role_description(),
-                "variable_desc": variable.get_role_description(),
-                "variable_modality": variable.describe_modality(),
-                "variable_modality_type": variable.get_modality()
+                "variable_desc": variable.get_role_description()
             }
 
             if response._reduce_meta:
