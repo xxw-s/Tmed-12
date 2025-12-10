@@ -140,9 +140,7 @@ class LLMCall(Function):
                 "prompt": prompt,
                 "system_prompt": system_prompt,
                 "variable_desc": variable.get_role_description(),
-                "variable_short": variable.get_short_value(),
-                "variable_modality": variable.describe_modality(),
-                "variable_modality_type": variable.get_modality()
+                "variable_short": variable.get_short_value()
             }
             
             backward_prompt = LLMCall._construct_llm_chain_backward_prompt(backward_info)
@@ -157,9 +155,7 @@ class LLMCall(Function):
             variable.gradients_context[var_gradients] = {
                 "context": conversation, 
                 "response_desc": response.get_role_description(),
-                "variable_desc": variable.get_role_description(),
-                "variable_modality": variable.describe_modality(),
-                "variable_modality_type": variable.get_modality()
+                "variable_desc": variable.get_role_description()
             }
             
             if response._reduce_meta:
@@ -205,9 +201,7 @@ class LLMCall(Function):
                 "prompt": prompt,
                 "system_prompt": system_prompt,
                 "variable_desc": variable.get_role_description(),
-                "variable_short": variable.get_short_value(),
-                "variable_modality": variable.describe_modality(),
-                "variable_modality_type": variable.get_modality()
+                "variable_short": variable.get_short_value()
             }
             
             backward_prompt = LLMCall._construct_llm_base_backward_prompt(backward_info)
@@ -222,9 +216,7 @@ class LLMCall(Function):
             variable.gradients_context[var_gradients] = {
                 "context": conversation, 
                 "response_desc": response.get_role_description(),
-                "variable_desc": variable.get_role_description(),
-                "variable_modality": variable.describe_modality(),
-                "variable_modality_type": variable.get_modality()
+                "variable_desc": variable.get_role_description()
             }
 
             if response._reduce_meta:
@@ -422,8 +414,6 @@ class LLMCall_with_in_context_examples(LLMCall):
                 "system_prompt": system_prompt,
                 "variable_desc": variable.get_role_description(),
                 "variable_short": variable.get_short_value(),
-                "variable_modality": variable.describe_modality(),
-                "variable_modality_type": variable.get_modality(),
                 "in_context_examples": "\n".join(in_context_examples) if in_context_examples is not None else [],
             }
             
@@ -439,9 +429,7 @@ class LLMCall_with_in_context_examples(LLMCall):
             variable.gradients_context[var_gradients] = {
                 "context": conversation, 
                 "response_desc": response.get_role_description(),
-                "variable_desc": variable.get_role_description(),
-                "variable_modality": variable.describe_modality(),
-                "variable_modality_type": variable.get_modality()
+                "variable_desc": variable.get_role_description()
             }
             
             if response._reduce_meta:
@@ -495,8 +483,6 @@ class LLMCall_with_in_context_examples(LLMCall):
                 "system_prompt": system_prompt,
                 "variable_desc": variable.get_role_description(),
                 "variable_short": variable.get_short_value(),
-                "variable_modality": variable.describe_modality(),
-                "variable_modality_type": variable.get_modality(),
                 "in_context_examples": "\n".join(in_context_examples) if in_context_examples is not None else [],
 
             }
@@ -513,9 +499,7 @@ class LLMCall_with_in_context_examples(LLMCall):
             variable.gradients_context[var_gradients] = {
                 "context": conversation, 
                 "response_desc": response.get_role_description(),
-                "variable_desc": variable.get_role_description(),
-                "variable_modality": variable.describe_modality(),
-                "variable_modality_type": variable.get_modality()
+                "variable_desc": variable.get_role_description()
             }
 
             if response._reduce_meta:
