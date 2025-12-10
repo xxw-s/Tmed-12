@@ -12,10 +12,7 @@ from .llm_backward_prompts import (
     OBJECTIVE_INSTRUCTION_BASE,
     BACKWARD_SYSTEM_PROMPT,
 )
-from .multimodal_backward_prompts import (
-    IMAGE_FEEDBACK_INSTRUCTION,
-    MULTIMODAL_CONVERSATION_TEMPLATE,
-)
+from .multimodal_backward_prompts import MULTIMODAL_CONVERSATION_TEMPLATE
 from typing import Union
 from textgrad.config import validate_engine_or_get_default
 from .function import Function, BackwardContext
@@ -105,8 +102,6 @@ class MultimodalLLMCall(Function):
         backward_prompt = CONVERSATION_START_INSTRUCTION_CHAIN.format(conversation=conversation, **backward_info)
         backward_prompt += OBJECTIVE_INSTRUCTION_CHAIN.format(**backward_info)
         backward_prompt += EVALUATE_VARIABLE_INSTRUCTION.format(**backward_info)
-        if backward_info.get("variable_modality_type") == "image":
-            backward_prompt += f"\n\n{IMAGE_FEEDBACK_INSTRUCTION}"
         content.append(backward_prompt)
         return content
 
@@ -127,9 +122,7 @@ class MultimodalLLMCall(Function):
                 "input_content": input_content,
                 "system_prompt": system_prompt,
                 "variable_desc": variable.get_role_description(),
-                "variable_short": variable.get_short_value(),
-                "variable_modality": variable.describe_modality(),
-                "variable_modality_type": variable.get_modality()
+                "variable_short": variable.get_short_value()
             }
             
             backward_content = MultimodalLLMCall._construct_multimodal_llm_chain_backward_content(backward_info)
@@ -142,11 +135,9 @@ class MultimodalLLMCall(Function):
             variable.gradients.add(var_gradients)
             conversation = MULTIMODAL_CONVERSATION_TEMPLATE.format(**backward_info)
             variable.gradients_context[var_gradients] = {
-                "context": input_content + [conversation],
+                "context": input_content + [conversation], 
                 "response_desc": response.get_role_description(),
-                "variable_desc": variable.get_role_description(),
-                "variable_modality": variable.describe_modality(),
-                "variable_modality_type": variable.get_modality()
+                "variable_desc": variable.get_role_description()
             }
             
             if response._reduce_meta:
@@ -160,8 +151,6 @@ class MultimodalLLMCall(Function):
         backward_prompt = CONVERSATION_START_INSTRUCTION_BASE.format(conversation=conversation, **backward_info)
         backward_prompt += OBJECTIVE_INSTRUCTION_BASE.format(**backward_info)
         backward_prompt += EVALUATE_VARIABLE_INSTRUCTION.format(**backward_info)
-        if backward_info.get("variable_modality_type") == "image":
-            backward_prompt += f"\n\n{IMAGE_FEEDBACK_INSTRUCTION}"
         content.append(backward_prompt)
         return content
 
@@ -181,9 +170,7 @@ class MultimodalLLMCall(Function):
                 "input_content": input_content,
                 "system_prompt": system_prompt,
                 "variable_desc": variable.get_role_description(),
-                "variable_short": variable.get_short_value(),
-                "variable_modality": variable.describe_modality(),
-                "variable_modality_type": variable.get_modality()
+                "variable_short": variable.get_short_value()
             }
             
             backward_content = MultimodalLLMCall._construct_multimodal_llm_base_backward_content(backward_info)
@@ -196,11 +183,9 @@ class MultimodalLLMCall(Function):
             var_gradients = Variable(value=gradient_value, role_description=f"feedback to {variable.get_role_description()}")
             variable.gradients.add(var_gradients)
             variable.gradients_context[var_gradients] = {
-                "context": input_content + [conversation],
+                "context": input_content + [conversation], 
                 "response_desc": response.get_role_description(),
-                "variable_desc": variable.get_role_description(),
-                "variable_modality": variable.describe_modality(),
-                "variable_modality_type": variable.get_modality()
+                "variable_desc": variable.get_role_description()
             }
 
             if response._reduce_meta:
